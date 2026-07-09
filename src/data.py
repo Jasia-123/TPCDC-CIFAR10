@@ -59,7 +59,13 @@ def get_test_loader(
 
 
 if __name__ == "__main__":
-    train_dataset, test_dataset = get_cifar10_datasets()
+    import os
+
+    data_dir = os.environ.get("CIFAR10_DATA_DIR", "./data")
+
+    train_dataset, test_dataset = get_cifar10_datasets(
+        data_dir=data_dir
+    )
 
     print(f"Training samples: {len(train_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
