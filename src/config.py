@@ -1,49 +1,112 @@
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    # Dataset
-    num_classes: int = 10
+    """
+    Configuration for TPCDC on CIFAR-10.
 
-    # Active learning
+    TPCDC uses the SCAN pipeline for deep clustering. It must not
+    use K-means for the final cluster assignments.
+    """
+
+    # Dataset
+
+    num_classes: int = 10
+    num_training_samples: int = 50_000
+    embedding_dim: int = 512
+
+    # Active learning protocol
+
     initial_labelled_size: int = 0
     query_budget: int = 10
     num_al_rounds: int = 5
 
-    # TypiClust
-    num_neighbours: int = 20
+    # TypiClust selection
+
+    typicality_neighbours: int = 20
     min_cluster_size: int = 5
     max_clusters: int = 500
 
-    # Representation learning
-    embedding_dim: int = 512
+    # SCAN representation pretraining
+
+    pretrain_epochs: int = 50
+    pretrain_batch_size: int = 512
+    pretrain_learning_rate: float = 0.4
+    pretrain_momentum: float = 0.9
+    pretrain_weight_decay: float = 1e-4
+    pretrain_temperature: float = 0.5
     projection_dim: int = 128
 
-    # SimCLR pretraining
-    simclr_epochs: int = 50
-    simclr_batch_size: int = 512
-    simclr_learning_rate: float = 0.4
-    simclr_momentum: float = 0.9
-    simclr_weight_decay: float = 1e-4
-    temperature: float = 0.5
+    # Nearest-neighbour mining for SCAN
 
-    # SCAN clustering
+    scan_neighbours: int = 20
+
+    # SCAN clustering stage
+    #
+    # Only SCAN's first clustering stage will be trained.
+    # The self-labelling / pseudo-labelling stage is not used.
+
     scan_epochs: int = 50
-    scan_batch_size: int = 512
+    scan_batch_size: int = 128
     scan_learning_rate: float = 0.1
-    scan_entropy_weight: float = 2.0
+    scan_momentum: float = 0.9
+    scan_weight_decay: float = 1e-4
+    scan_entropy_weight: float = 5.0
+
+    # Data loading
+
+    num_workers: int = 2
 
     # Reproducibility
+
     seed: int = 42
 
     @property
-    def cumulative_budgets(self):
+    def cumulative_budgets(self) -> list[int]:
+        """Return the labelled-set size after each AL round."""
         return [
             self.initial_labelled_size
             + self.query_budget * round_number
             for round_number in range(1, self.num_al_rounds + 1)
         ]
 
-    def to_dict(self):
+    def cluster_count(self, labelled_size: int) -> int:
+        """
+        Return the number of SCAN output clusters for one AL round.
+
+        Paper rule:
+            K = min(|L| + B, max_clusters)
+        """
+        if labelled_size < 0:
+            raise ValueError("labelled_size must be non-negative.")
+
+        return min(
+            labelled_size + self.query_budget,
+            self.max_clusters,
+        )
+
+    def validate(self) -> None:
+        """Validate important configuration constraints."""
+        if self.query_budget <= 0:
+            raise ValueError("query_budget must be positive.")
+
+        if self.num_al_rounds <= 0:
+            raise ValueError("num_al_rounds must be positive.")
+
+        if self.typicality_neighbours <= 0:
+            raise ValueError("typicality_neighbours must be positive.")
+
+        if self.min_cluster_size < 1:
+            raise ValueError("min_cluster_size must be at least 1.")
+
+        if self.max_clusters < self.query_budget:
+            raise ValueError(
+                "max_clusters must be at least as large as query_budget."
+            )
+
+        if self.pretrain_epochs <= 0 or self.scan_epochs <= 0:
+            raise ValueError("Training epochs must be positive.")
+
+    def to_dict(self) -> dict:
         return asdict(self)
