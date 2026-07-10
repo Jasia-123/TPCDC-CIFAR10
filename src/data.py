@@ -7,6 +7,40 @@ CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2470, 0.2435, 0.2616)
 
 
+class SimCLRTransform:
+    def __init__(self):
+        self.transform = transforms.Compose([
+            transforms.RandomResizedCrop(
+                size=32,
+                scale=(0.2, 1.0),
+            ),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomApply(
+                [
+                    transforms.ColorJitter(
+                        brightness=0.4,
+                        contrast=0.4,
+                        saturation=0.4,
+                        hue=0.1,
+                    )
+                ],
+                p=0.8,
+            ),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                CIFAR10_MEAN,
+                CIFAR10_STD,
+            ),
+        ])
+
+    def __call__(self, image):
+        return (
+            self.transform(image),
+            self.transform(image),
+        )
+
+
 def get_cifar10_datasets(data_dir="./data"):
     """
     Load CIFAR-10 training and test datasets.
@@ -42,6 +76,32 @@ def get_cifar10_datasets(data_dir="./data"):
     )
 
     return train_dataset, test_dataset
+
+
+def get_simclr_dataset(data_dir="./data"):
+    return datasets.CIFAR10(
+        root=data_dir,
+        train=True,
+        download=True,
+        transform=SimCLRTransform(),
+    )
+
+
+def get_embedding_dataset(data_dir="./data"):
+    embedding_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(
+            CIFAR10_MEAN,
+            CIFAR10_STD,
+        ),
+    ])
+
+    return datasets.CIFAR10(
+        root=data_dir,
+        train=True,
+        download=True,
+        transform=embedding_transform,
+    )
 
 
 def get_test_loader(
