@@ -1,3 +1,4 @@
+from copy import deepcopy
 import random
 from typing import Optional
 
@@ -434,7 +435,6 @@ def train_scan(
     epochs: int,
     batch_size: int,
     learning_rate: float,
-    momentum: float,
     weight_decay: float,
     entropy_weight: float,
     num_workers: int = 2,
@@ -461,17 +461,15 @@ def train_scan(
 
     model = model.to(device)
 
-    optimizer = torch.optim.SGD(
+    optimizer = torch.optim.Adam(
         model.parameters(),
         lr=learning_rate,
-        momentum=momentum,
         weight_decay=weight_decay,
     )
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=epochs,
-    )
+    best_loss = float("inf")
+    best_state_dict = None
+    best_epoch = None
 
     for epoch in range(epochs):
         model.train()
@@ -539,17 +537,41 @@ def train_scan(
             ).mean().item()
             total_batches += 1
 
-        scheduler.step()
-
         denominator = max(total_batches, 1)
+
+        average_loss = total_loss_value / denominator
+        average_consistency = total_consistency / denominator
+        average_entropy = total_entropy / denominator
+
+        if not np.isfinite(average_loss):
+            raise RuntimeError(
+                f"Non-finite SCAN loss encountered at epoch {epoch + 1}."
+            )
+
+        if average_loss < best_loss:
+            best_loss = average_loss
+            best_epoch = epoch + 1
+            best_state_dict = deepcopy(model.state_dict())
 
         print(
             f"SCAN epoch [{epoch + 1}/{epochs}] "
-            f"loss: {total_loss_value / denominator:.4f} | "
-            f"consistency: "
-            f"{total_consistency / denominator:.4f} | "
-            f"entropy: {total_entropy / denominator:.4f}"
+            f"loss: {average_loss:.4f} | "
+            f"consistency: {average_consistency:.4f} | "
+            f"entropy: {average_entropy:.4f} | "
+            f"best epoch: {best_epoch}"
         )
+
+    if best_state_dict is None:
+        raise RuntimeError(
+            "SCAN training did not produce a valid model state."
+        )
+
+    model.load_state_dict(best_state_dict)
+
+    print(
+        f"Restored lowest-loss SCAN model from epoch "
+        f"{best_epoch} with loss {best_loss:.4f}."
+    )
 
     return model
 
