@@ -51,6 +51,36 @@ class ContrastiveTransform:
         )
 
 
+class SCANTransform:
+    """
+    Strong augmentation used while training SCAN's clustering stage.
+
+    Feature extraction and final cluster prediction must continue
+    using deterministic preprocessing instead.
+    """
+
+    def __init__(self) -> None:
+        self.transform = transforms.Compose([
+            transforms.RandomCrop(
+                size=32,
+                padding=4,
+            ),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandAugment(
+                num_ops=4,
+                magnitude=10,
+            ),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                CIFAR10_MEAN,
+                CIFAR10_STD,
+            ),
+        ])
+
+    def __call__(self, image):
+        return self.transform(image)
+
+
 class IndexedDataset(Dataset):
     """
     Wrap a dataset so that each item also returns its original index.
@@ -153,6 +183,27 @@ def get_pretraining_dataset(
     )
 
 
+def get_scan_dataset(
+    data_dir: str = "./data",
+) -> Dataset:
+    """
+    Return indexed CIFAR-10 images with strong augmentation.
+
+    This dataset is used only while training SCAN's clustering stage.
+    CIFAR-10 labels are returned internally by torchvision but are
+    ignored by SCAN.
+    """
+
+    dataset = datasets.CIFAR10(
+        root=data_dir,
+        train=True,
+        download=True,
+        transform=SCANTransform(),
+    )
+
+    return IndexedDataset(dataset)
+
+
 def get_feature_dataset(
     data_dir: str = "./data",
     include_indices: bool = True,
@@ -239,6 +290,13 @@ if __name__ == "__main__":
     pretraining_dataset = get_pretraining_dataset(
         data_dir=data_dir,
     )
+
+    print(f"SCAN samples: {len(scan_dataset)}")
+
+    scan_image, _, scan_index = scan_dataset[0]
+
+    print(f"SCAN image shape: {scan_image.shape}")
+    print(f"SCAN index: {scan_index}")
 
     feature_dataset = get_feature_dataset(
         data_dir=data_dir,
