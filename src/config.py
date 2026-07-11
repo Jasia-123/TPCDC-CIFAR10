@@ -44,12 +44,14 @@ class ExperimentConfig:
 
     # SCAN clustering stage
     #
-    # Only SCAN's first clustering stage will be trained.
-    # The self-labelling / pseudo-labelling stage is not used.
+    # The original SCAN paper trains this stage for 100 epochs.
+    # We use 50 epochs because of Colab resource limits.
+    # This deviation will be discussed in the report.
 
     scan_epochs: int = 50
     scan_batch_size: int = 128
-    scan_learning_rate: float = 0.1
+    scan_optimizer: str = "adam"
+    scan_learning_rate: float = 1e-4
     scan_momentum: float = 0.9
     scan_weight_decay: float = 1e-4
     scan_entropy_weight: float = 5.0
