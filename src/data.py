@@ -291,12 +291,9 @@ if __name__ == "__main__":
         data_dir=data_dir,
     )
 
-    print(f"SCAN samples: {len(scan_dataset)}")
-
-    scan_image, _, scan_index = scan_dataset[0]
-
-    print(f"SCAN image shape: {scan_image.shape}")
-    print(f"SCAN index: {scan_index}")
+    scan_dataset = get_scan_dataset(
+        data_dir=data_dir,
+    )
 
     feature_dataset = get_feature_dataset(
         data_dir=data_dir,
@@ -306,12 +303,15 @@ if __name__ == "__main__":
     print(f"Training samples: {len(train_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
     print(f"Pretraining samples: {len(pretraining_dataset)}")
+    print(f"SCAN samples: {len(scan_dataset)}")
     print(f"Feature samples: {len(feature_dataset)}")
     print(f"Classes: {train_dataset.classes}")
 
     train_image, train_label = train_dataset[0]
 
     (view_one, view_two), _ = pretraining_dataset[0]
+
+    scan_image, _, scan_index = scan_dataset[0]
 
     feature_image, feature_label, feature_index = (
         feature_dataset[0]
@@ -320,6 +320,8 @@ if __name__ == "__main__":
     print(f"Classifier image shape: {train_image.shape}")
     print(f"Contrastive view 1 shape: {view_one.shape}")
     print(f"Contrastive view 2 shape: {view_two.shape}")
+    print(f"SCAN image shape: {scan_image.shape}")
+    print(f"SCAN index: {scan_index}")
     print(f"Feature image shape: {feature_image.shape}")
     print(f"Feature index: {feature_index}")
     print(f"Example label: {feature_label}")
