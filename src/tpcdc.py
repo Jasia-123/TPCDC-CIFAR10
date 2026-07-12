@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 
 import numpy as np
-from sklearn.metrics import pairwise_distances
+from sklearn.neighbors import NearestNeighbors
 
 
 @dataclass
@@ -110,8 +110,8 @@ def compute_cluster_typicalities(
     Typicality is the inverse mean Euclidean distance to the
     nearest neighbours inside the same cluster.
 
-    The point itself is excluded. Therefore the practical number
-    of neighbours is min(max_neighbours, cluster_size - 1).
+    The point itself is excluded, so the number of neighbours is:
+        min(max_neighbours, cluster_size - 1)
     """
 
     if max_neighbours <= 0:
@@ -134,31 +134,43 @@ def compute_cluster_typicalities(
 
     cluster_features = features[cluster_indices]
 
-    distances = pairwise_distances(
-        cluster_features,
-        metric="euclidean",
-        n_jobs=-1,
-    )
-
-    # Exclude each point from its own neighbour set.
-    np.fill_diagonal(
-        distances,
-        np.inf,
-    )
-
     neighbour_count = min(
         max_neighbours,
         cluster_size - 1,
     )
 
-    nearest_distances = np.partition(
-        distances,
-        kth=neighbour_count - 1,
-        axis=1,
-    )[:, :neighbour_count]
+    nearest_neighbours = NearestNeighbors(
+        n_neighbors=neighbour_count + 1,
+        metric="euclidean",
+        algorithm="auto",
+        n_jobs=-1,
+    )
 
-    mean_distances = nearest_distances.mean(
-        axis=1
+    nearest_neighbours.fit(
+        cluster_features
+    )
+
+    distances, indices = (
+        nearest_neighbours.kneighbors(
+            cluster_features,
+            return_distance=True,
+        )
+    )
+
+    # The first neighbour should be the point itself.
+    neighbour_distances = distances[:, 1:]
+
+    if neighbour_distances.shape != (
+        cluster_size,
+        neighbour_count,
+    ):
+        raise RuntimeError(
+            "Unexpected nearest-neighbour "
+            "distance shape."
+        )
+
+    mean_distances = neighbour_distances.mean(
+        axis=1,
     )
 
     typicalities = 1.0 / (
@@ -187,7 +199,7 @@ def select_tpcdc_queries(
 
     At each selection step:
 
-      1. Exclude clusters below min_cluster_size.
+      1. Exclude clusters with fewer than min_cluster_size samples.
       2. Find clusters containing the fewest currently labelled points.
       3. Among those clusters, choose the largest cluster that still
          contains an unlabelled sample.
@@ -239,6 +251,12 @@ def select_tpcdc_queries(
         for cluster_id, members in cluster_members.items():
             cluster_size = len(members)
 
+            # Paper wording is slightly ambiguous:
+            # - clusters with fewer than 5 samples are dropped;
+            # - another sentence says clusters should be larger than 5.
+            #
+            # We follow the explicit "drop fewer than 5" rule, so clusters
+            # of exactly 5 samples remain eligible.
             if cluster_size < min_cluster_size:
                 continue
 
