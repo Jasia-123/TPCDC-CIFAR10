@@ -43,6 +43,42 @@ class ResNet18Encoder(nn.Module):
         return self.backbone(images)
 
 
+class CIFAR10Classifier(nn.Module):
+    """
+    ResNet-18 classifier used to evaluate selected labelled sets.
+
+    A fresh instance must be created for every active-learning
+    round so that evaluation does not carry information between
+    cumulative budgets.
+    """
+
+    def __init__(
+        self,
+        num_classes: int = 10,
+    ) -> None:
+        super().__init__()
+
+        if num_classes <= 0:
+            raise ValueError(
+                "num_classes must be positive."
+            )
+
+        self.encoder = ResNet18Encoder()
+
+        self.classifier = nn.Linear(
+            self.encoder.feature_dim,
+            num_classes,
+        )
+
+    def forward(
+        self,
+        images: torch.Tensor,
+    ) -> torch.Tensor:
+        features = self.encoder(images)
+
+        return self.classifier(features)
+
+
 class ContrastivePretrainModel(nn.Module):
     """
     Contrastive representation model used as SCAN's pretext stage.
