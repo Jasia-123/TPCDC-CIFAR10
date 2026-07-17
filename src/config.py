@@ -10,6 +10,14 @@ class ExperimentConfig:
     use K-means for the final cluster assignments.
     """
 
+    # Supervised evaluation
+
+    classifier_epochs: int = 100
+    classifier_batch_size: int = 128
+    classifier_learning_rate: float = 0.025
+    classifier_momentum: float = 0.9
+    classifier_weight_decay: float = 5e-4
+
     # Dataset
 
     num_classes: int = 10
@@ -109,6 +117,16 @@ class ExperimentConfig:
 
         if self.pretrain_epochs <= 0 or self.scan_epochs <= 0:
             raise ValueError("Training epochs must be positive.")
+
+        if self.classifier_epochs <= 0:
+            raise ValueError(
+                "classifier_epochs must be positive."
+            )
+
+        if self.classifier_batch_size <= 0:
+            raise ValueError(
+                "classifier_batch_size must be positive."
+            )
 
     def to_dict(self) -> dict:
         return asdict(self)
