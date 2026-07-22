@@ -338,15 +338,28 @@ def select_tpcdc_queries(
             "unlabelled_members"
         ]
 
-        # Highest typicality first. Dataset index is a
-        # deterministic tie-breaker.
-        selected_index = sorted(
+        candidate_indices = np.asarray(
             unlabelled_members,
-            key=lambda index: (
-                -cluster_typicalities[index],
-                index,
-            ),
-        )[0]
+            dtype=np.int64,
+        )
+
+        candidate_typicalities = np.asarray(
+            [
+                cluster_typicalities[index]
+                for index in candidate_indices
+            ],
+            dtype=np.float32,
+        )
+
+        selected_index, selection_diagnostics = (
+            select_diversity_aware_sample(
+                candidate_indices=candidate_indices,
+                typicality_scores=candidate_typicalities,
+                features=features,
+                labelled_indices=labelled_indices,
+                alpha=DIVERSITY_ALPHA,
+            )
+        )
 
         selected_typicality = (
             cluster_typicalities[selected_index]
